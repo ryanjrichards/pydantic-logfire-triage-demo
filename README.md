@@ -128,6 +128,6 @@ LIMIT 50
 
 4. **Run SQL queries** — paste the queries above into the Logfire SQL explorer. Show ticket volume by category, P95 latency by customer tier, and eval accuracy trends. Query the PostgreSQL table directly for the persisted history.
 
-5. **Run evals** — in a separate terminal run `python evals.py`. Each of the 10 golden-dataset tickets is triaged and logged as a structured `eval.result` span. The terminal prints a summary table; the eval pass rate SQL query in Logfire shows the trend over time.
+5. **Run evals** — in a separate terminal run `python evals.py`. Each of the 10 golden-dataset tickets is triaged and logged as a structured `eval.result` span with per-case metrics: `input_tokens`, `output_tokens`, `cost_usd`, and `confidence`. The terminal prints a summary table; the eval pass rate SQL query in Logfire shows the trend over time, and you can filter by confidence to find cases where the model was uncertain.
 
 6. **Hit "Triage All"** — back in the UI, click the green "Triage All" button to batch-triage all 20 seed tickets in one shot. The history feed fills up, Logfire captures every trace, and all results land in PostgreSQL.
