@@ -1,6 +1,6 @@
-logfire[fastapi,anthropic]
+logfire[fastapi]
 fastapi
 uvicorn[standard]
-pydantic-ai[anthropic]
+pydantic-ai[google]
 pydantic
 python-multipart

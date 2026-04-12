@@ -9,7 +9,7 @@ from models import SupportTicket, TriageResult
 # every agent.run() call produces a full trace with LLM tokens, prompts, and
 # structured outputs, with zero extra instrumentation code needed.
 agent = Agent(
-    "anthropic:claude-haiku-4-5-20251001",
+    "google-gla:gemini-2.0-flash",
     result_type=TriageResult,
     system_prompt="""You are an expert customer support triage assistant.
 

@@ -1,6 +1,6 @@
 # AI Support Ticket Triage System
 
-A FastAPI + pydantic-ai demo that triages support tickets using Claude Haiku, with full observability via Logfire.
+A FastAPI + pydantic-ai demo that triages support tickets using Gemini 2.0 Flash, with full observability via Logfire.
 
 **GitHub:** https://github.com/ryanjrichards/pydantic-logfire-triage-demo
 
@@ -20,7 +20,7 @@ cp .env .env.local
 
 ```ini
 # .env.local
-ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_API_KEY=...    # aistudio.google.com/apikey
 LOGFIRE_TOKEN=...     # logfire.pydantic.dev → project settings → tokens
 ```
 
