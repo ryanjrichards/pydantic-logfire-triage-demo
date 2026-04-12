@@ -14,7 +14,7 @@ from pydantic import BaseModel
 # Configure Logfire first — this enables automatic instrumentation for
 # pydantic-ai (LLM calls, token counts, structured outputs) and FastAPI
 # (request traces, route spans, validation errors).
-logfire.configure()
+logfire.configure(service_name="support-triage")
 logfire.instrument_pydantic_ai()  # sets gen_ai.agent.name so agents appear in the Logfire Agents view
 logfire.instrument_asyncpg()  # captures every asyncpg query as a span with SQL, parameters, and row counts
 
