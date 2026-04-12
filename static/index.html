@@ -106,6 +106,11 @@
       gap: 0;
       flex: 1;
       overflow: hidden;
+      transition: grid-template-rows 0.25s ease;
+    }
+
+    .main.history-collapsed {
+      grid-template-rows: 1fr 41px;
     }
 
     /* ── Left panel: ticket queue ── */
@@ -479,6 +484,47 @@
     .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
     .copy-btn.copied { border-color: var(--accent); color: var(--accent); }
 
+    .send-btn {
+      margin-top: 10px;
+      width: 100%;
+      padding: 10px;
+      background: #0d2044;
+      border: 1px solid var(--cyan);
+      color: var(--cyan);
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .send-btn:hover:not(:disabled) { background: var(--cyan); color: #000; }
+    .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .send-spinner {
+      display: none;
+      width: 14px; height: 14px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    .send-error {
+      margin-top: 8px;
+      padding: 8px 12px;
+      background: #2b0d0d;
+      border: 1px solid #5a1a1a;
+      border-radius: 6px;
+      color: var(--red);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
     /* ── History feed ── */
     .history-panel {
       border-top: 1px solid var(--border);
@@ -697,15 +743,21 @@
           <div class="draft-response" id="draftResponse"></div>
           <button class="copy-btn" id="copyBtn" onclick="copyDraft()">Copy</button>
         </div>
+        <div id="sendError" class="send-error" style="display:none"></div>
+        <button class="send-btn" id="sendBtn" onclick="sendDraft()">
+          <span id="sendBtnLabel">Send Response</span>
+          <div class="send-spinner" id="sendSpinner"></div>
+        </button>
       </div>
     </div>
   </div>
 
   <!-- Bottom: history feed -->
   <div class="history-panel">
-    <div class="panel-header">
+    <div class="panel-header" onclick="toggleHistory()" style="cursor:pointer;user-select:none">
       <span class="panel-title">History Feed</span>
       <span class="ticket-count" id="historyCount">0 results</span>
+      <span id="historyChevron" style="margin-left:8px;color:var(--text-muted);font-size:11px;transition:transform 0.25s ease;display:inline-block">▲</span>
     </div>
     <div class="history-list" id="historyList">
       <div style="padding:8px 0;color:var(--text-muted);font-size:12px">No results yet</div>
@@ -715,6 +767,15 @@
 </div>
 
 <script>
+  // ── History collapse ──
+  let historyCollapsed = true;
+
+  function toggleHistory() {
+    historyCollapsed = !historyCollapsed;
+    document.querySelector('.main').classList.toggle('history-collapsed', historyCollapsed);
+    document.getElementById('historyChevron').style.transform = historyCollapsed ? 'rotate(180deg)' : '';
+  }
+
   // ── State ──
   let tickets = [];
   let history = [];
@@ -983,10 +1044,12 @@
     document.getElementById('summaryText').textContent = result.summary;
     document.getElementById('draftResponse').textContent = result.draft_response;
 
-    // Reset copy button
+    // Reset copy and send buttons
     const cb = document.getElementById('copyBtn');
     cb.textContent = 'Copy';
     cb.classList.remove('copied');
+    document.getElementById('sendError').style.display = 'none';
+    document.getElementById('sendBtnLabel').textContent = 'Send Response';
 
     // Re-trigger animation
     rc.style.animation = 'none';
@@ -1050,6 +1113,41 @@
     if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
+  async function sendDraft() {
+    const ticket = tickets.find(t => t.id === activeId);
+    if (!ticket) return;
+
+    const btn = document.getElementById('sendBtn');
+    const label = document.getElementById('sendBtnLabel');
+    const spinner = document.getElementById('sendSpinner');
+    const errorEl = document.getElementById('sendError');
+
+    btn.disabled = true;
+    label.textContent = 'Sending…';
+    spinner.style.display = 'block';
+    errorEl.style.display = 'none';
+
+    try {
+      const res = await fetch('/send-response', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticket_id: ticket.id,
+          recipient: ticket.username,
+          draft: document.getElementById('draftResponse').textContent,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to send email response');
+    } catch (e) {
+      errorEl.textContent = 'Failed to send response.';
+      errorEl.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      label.textContent = 'Send Response';
+      spinner.style.display = 'none';
+    }
+  }
+
   function copyDraft() {
     const text = document.getElementById('draftResponse').textContent;
     navigator.clipboard.writeText(text).then(() => {
@@ -1077,6 +1175,10 @@
   function escHtml(s) {
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
+
+  // Apply initial collapsed state before first paint
+  document.querySelector('.main').classList.add('history-collapsed');
+  document.getElementById('historyChevron').style.transform = 'rotate(180deg)';
 
   init();
 </script>

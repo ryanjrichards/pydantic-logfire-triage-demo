@@ -124,10 +124,12 @@ LIMIT 50
 
 2. **Triage a ticket live** — click any ticket card, hit "Triage →". Watch the result panel animate in: category badge, severity color, confidence bar, draft response. The result is saved to PostgreSQL automatically.
 
-3. **Pivot to Logfire** — open your Logfire project. You'll see a trace for the HTTP request, nested inside it the `agent.triage` span, and inside *that* the full pydantic-ai LLM call with token counts, prompt, and structured output — zero extra instrumentation code needed because pydantic-ai integrates with Logfire automatically.
+3. **Send a response (error demo)** — with a result on screen, click **Send Response**. The request hits `/send-response`, which simulates a misconfigured SendGrid API key and returns a 502. You'll see "Failed to send response." in the UI and a `logfire.error` span in Logfire with the full error context (`error_code`, `provider`, `ticket_id`). Good hook for showing how Logfire surfaces application errors alongside traces.
 
-4. **Run SQL queries** — paste the queries above into the Logfire SQL explorer. Show ticket volume by category, P95 latency by customer tier, and eval accuracy trends. Query the PostgreSQL table directly for the persisted history.
+4. **Pivot to Logfire** — open your Logfire project. You'll see a trace for the HTTP request, nested inside it the `agent.triage` span (set via `logfire.instrument_pydantic_ai()`), and inside *that* the full pydantic-ai LLM call with token counts, prompt, and structured output. The agent appears by name (`support-triage`) in the Logfire Agents view.
 
-5. **Run evals** — in a separate terminal run `python evals.py`. Each of the 10 golden-dataset tickets is triaged and logged as a structured `eval.result` span with per-case metrics: `input_tokens`, `output_tokens`, `cost_usd`, and `confidence`. The terminal prints a summary table; the eval pass rate SQL query in Logfire shows the trend over time, and you can filter by confidence to find cases where the model was uncertain.
+5. **Run SQL queries** — paste the queries above into the Logfire SQL explorer. Show ticket volume by category, P95 latency by customer tier, and eval accuracy trends. Query the PostgreSQL table directly for the persisted history.
 
-6. **Hit "Triage All"** — back in the UI, click the green "Triage All" button to batch-triage all 20 seed tickets in one shot. The history feed fills up, Logfire captures every trace, and all results land in PostgreSQL.
+6. **Run evals** — in a separate terminal run `python evals.py`. Each of the 10 golden-dataset tickets is triaged and logged as a structured `eval.result` span with per-case metrics: `input_tokens`, `output_tokens`, `cost_usd`, and `confidence`. The terminal prints a summary table; the eval pass rate SQL query in Logfire shows the trend over time, and you can filter by confidence to find cases where the model was uncertain.
+
+7. **Hit "Triage All"** — back in the UI, click the green "Triage All" button to batch-triage all 20 seed tickets in one shot. The history feed (collapsible via the header) fills up, Logfire captures every trace, and all results land in PostgreSQL.

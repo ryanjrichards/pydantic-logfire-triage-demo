@@ -15,6 +15,7 @@ from pydantic import BaseModel
 # pydantic-ai (LLM calls, token counts, structured outputs) and FastAPI
 # (request traces, route spans, validation errors).
 logfire.configure()
+logfire.instrument_pydantic_ai()  # sets gen_ai.agent.name so agents appear in the Logfire Agents view
 logfire.instrument_asyncpg()  # captures every asyncpg query as a span with SQL, parameters, and row counts
 
 from agent import triage_ticket  # noqa: E402 — must import after logfire.configure()
@@ -119,3 +120,31 @@ async def triage_batch(body: BatchRequest) -> list[TriageResponse]:
 async def list_results() -> list[dict]:
     """Return all stored triage results, newest first."""
     return await get_all_results()
+
+
+class SendResponseRequest(BaseModel):
+    ticket_id: str
+    recipient: str
+    draft: str
+
+
+@app.post("/send-response")
+async def send_response(body: SendResponseRequest) -> None:
+    """Send the draft response via email. Intentionally fails with an API key error."""
+    with logfire.span(
+        "email.send",
+        ticket_id=body.ticket_id,
+        recipient=body.recipient,
+        provider="sendgrid",
+    ):
+        # Simulate the API key check that fails
+        logfire.error(
+            "email.send.failed",
+            ticket_id=body.ticket_id,
+            recipient=body.recipient,
+            provider="sendgrid",
+            error_code="unauthorized",
+            error_message="The provided API key does not have the required 'Mail Send' permission. "
+            "Rotate the key in the SendGrid dashboard and update SENDGRID_API_KEY.",
+        )
+        raise HTTPException(status_code=502, detail="Failed to send email response")

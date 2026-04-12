@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logfire
-from pydantic_ai import Agent
+from pydantic_ai import Agent, AgentRunResult
 
 from models import SupportTicket, TriageResult
 
@@ -11,6 +11,7 @@ from models import SupportTicket, TriageResult
 agent = Agent(
     "google-gla:gemini-2.5-flash",
     output_type=TriageResult,
+    name="support-triage",
     system_prompt="""You are an expert customer support triage assistant.
 
 Your job is to analyze incoming support tickets and produce structured triage data.
@@ -38,6 +39,22 @@ Draft response guidelines:
 )
 
 
+def _build_prompt(ticket: SupportTicket) -> str:
+    return f"""Please triage this support ticket:
+
+Subject: {ticket.subject}
+Customer Tier: {ticket.customer_tier}
+
+Body:
+{ticket.body}
+"""
+
+
+async def run_triage(ticket: SupportTicket) -> AgentRunResult[TriageResult]:
+    """Run the agent and return the full result (includes usage, messages, etc.)."""
+    return await agent.run(_build_prompt(ticket))
+
+
 async def triage_ticket(ticket: SupportTicket) -> TriageResult:
     # Wrap the agent call in a named span so Logfire captures ticket-level
     # attributes alongside the automatic pydantic-ai LLM trace.
@@ -46,13 +63,5 @@ async def triage_ticket(ticket: SupportTicket) -> TriageResult:
         ticket_id=ticket.id,
         customer_tier=ticket.customer_tier,
     ):
-        prompt = f"""Please triage this support ticket:
-
-Subject: {ticket.subject}
-Customer Tier: {ticket.customer_tier}
-
-Body:
-{ticket.body}
-"""
-        result = await agent.run(prompt)
+        result = await run_triage(ticket)
         return result.output

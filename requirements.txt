@@ -1,4 +1,4 @@
-logfire[fastapi,asyncpg]
+logfire[fastapi,asyncpg,datasets]
 fastapi
 uvicorn[standard]
 pydantic-ai[google]
