@@ -1,0 +1,6 @@
+logfire[fastapi,anthropic]
+fastapi
+uvicorn[standard]
+pydantic-ai[anthropic]
+pydantic
+python-multipart

@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Support Ticket Triage</title>
+  <style>
+    /* ── Reset & base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-base:    #0d1117;
+      --bg-card:    #161b22;
+      --bg-card2:   #1c2330;
+      --bg-hover:   #21262d;
+      --border:     #30363d;
+      --text:       #e6edf3;
+      --text-muted: #8b949e;
+      --accent:     #39d353;   /* Logfire green */
+      --accent-dim: #1a4a28;
+      --cyan:       #58a6ff;
+      --gold:       #d29922;
+      --gold-dim:   #3d2b00;
+      --red:        #f85149;
+      --orange:     #db6d28;
+      --yellow:     #e3b341;
+      --green:      #3fb950;
+    }
+
+    body {
+      background: var(--bg-base);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .logo {
+      width: 28px; height: 28px;
+      background: var(--accent);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 14px; color: #000;
+    }
+
+    header h1 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    header .subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-left: 4px;
+    }
+
+    .header-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logfire-badge {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; color: var(--text-muted);
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 10px;
+    }
+
+    .logfire-badge .dot {
+      width: 7px; height: 7px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ── Main layout ── */
+    .main {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      grid-template-rows: 1fr 180px;
+      gap: 0;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Left panel: ticket queue ── */
+    .queue-panel {
+      grid-row: 1 / 3;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .panel-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+    }
+
+    .ticket-count {
+      font-size: 11px;
+      color: var(--text-muted);
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1px 7px;
+    }
+
+    .triage-all-btn {
+      width: calc(100% - 24px);
+      margin: 10px 12px;
+      flex-shrink: 0;
+      padding: 9px;
+      background: var(--accent-dim);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .triage-all-btn:hover:not(:disabled) {
+      background: var(--accent);
+      color: #000;
+    }
+
+    .triage-all-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .ticket-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 8px 8px;
+    }
+
+    .ticket-list::-webkit-scrollbar { width: 4px; }
+    .ticket-list::-webkit-scrollbar-track { background: transparent; }
+    .ticket-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* ── Ticket card ── */
+    .ticket-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      position: relative;
+    }
+
+    .ticket-card:hover { border-color: var(--cyan); background: var(--bg-hover); }
+    .ticket-card.active { border-color: var(--accent); background: var(--accent-dim); }
+    .ticket-card.processing { border-color: var(--cyan); }
+
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    .card-subject {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      flex: 1;
+      line-height: 1.3;
+    }
+
+    .tier-badge {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 2px 6px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .tier-free     { background: #21262d; color: var(--text-muted); border: 1px solid var(--border); }
+    .tier-pro      { background: #0d2044; color: var(--cyan);        border: 1px solid #1a4a88; }
+    .tier-enterprise { background: var(--gold-dim); color: var(--gold); border: 1px solid #5a3d00; }
+
+    .card-id {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: monospace;
+    }
+
+    .triage-btn {
+      position: absolute;
+      right: 10px;
+      bottom: 10px;
+      padding: 3px 10px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 5px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+
+    .triage-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .spinner {
+      display: none;
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--cyan);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-left: auto;
+    }
+
+    .ticket-card.processing .spinner { display: block; }
+    .ticket-card.processing .triage-btn { display: none; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Right panel: result ── */
+    .result-panel {
+      padding: 20px 24px;
+      overflow-y: auto;
+      background: var(--bg-base);
+    }
+
+    .result-panel::-webkit-scrollbar { width: 4px; }
+    .result-panel::-webkit-scrollbar-track { background: transparent; }
+    .result-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .empty-state {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      gap: 12px;
+    }
+
+    .empty-icon {
+      font-size: 40px;
+      opacity: 0.3;
+    }
+
+    .empty-state p { font-size: 14px; }
+
+    .result-content {
+      display: none;
+      animation: slideIn 0.25s ease-out;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-subject {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .result-body-text {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .result-badges {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      align-items: center;
+    }
+
+    .badge {
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-category {
+      background: #0d2044;
+      color: var(--cyan);
+      border: 1px solid #1a4a88;
+    }
+
+    .sev-low      { background: #0d2b0d; color: var(--green);  border: 1px solid #1a5c1a; }
+    .sev-medium   { background: #2b2000; color: var(--yellow); border: 1px solid #5a4200; }
+    .sev-high     { background: #2b1400; color: var(--orange); border: 1px solid #5a2d00; }
+    .sev-critical { background: #2b0d0d; color: var(--red);    border: 1px solid #5a1a1a; }
+
+    .confidence-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .confidence-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .progress-bar {
+      flex: 1;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 3px;
+      transition: width 0.5s ease-out;
+    }
+
+    .confidence-pct {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent);
+      min-width: 30px;
+      text-align: right;
+    }
+
+    .result-section {
+      margin-top: 16px;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .summary-text {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .draft-wrap {
+      position: relative;
+    }
+
+    .draft-response {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      white-space: pre-wrap;
+      padding-right: 80px;
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      padding: 4px 10px;
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 5px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .copy-btn.copied { border-color: var(--accent); color: var(--accent); }
+
+    /* ── History feed ── */
+    .history-panel {
+      border-top: 1px solid var(--border);
+      background: var(--bg-card);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .history-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 16px;
+    }
+
+    .history-list::-webkit-scrollbar { width: 4px; }
+    .history-list::-webkit-scrollbar-track { background: transparent; }
+    .history-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .history-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    .history-row:last-child { border-bottom: none; }
+
+    .hist-id {
+      font-family: monospace;
+      color: var(--text-muted);
+      min-width: 80px;
+    }
+
+    .hist-cat {
+      color: var(--cyan);
+      flex: 1;
+    }
+
+    .hist-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 10px;
+    }
+
+    .hist-conf {
+      color: var(--text-muted);
+      min-width: 36px;
+      text-align: right;
+    }
+
+    .hist-time {
+      color: var(--text-muted);
+      min-width: 52px;
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <div class="logo">LF</div>
+  <h1>Support Ticket Triage</h1>
+  <span class="subtitle">powered by pydantic-ai + logfire</span>
+  <div class="header-right">
+    <div class="logfire-badge">
+      <div class="dot"></div>
+      Logfire connected
+    </div>
+  </div>
+</header>
+
+<!-- ── Main ── -->
+<div class="main">
+
+  <!-- Left: ticket queue -->
+  <div class="queue-panel">
+    <div class="panel-header">
+      <span class="panel-title">Ticket Queue</span>
+      <span class="ticket-count" id="ticketCount">0 tickets</span>
+    </div>
+    <button class="triage-all-btn" id="triageAllBtn" onclick="triageAll()">
+      <span id="triageAllIcon">⚡</span>
+      <span id="triageAllLabel">Triage All</span>
+    </button>
+    <div class="ticket-list" id="ticketList">
+      <div style="text-align:center;padding:32px;color:var(--text-muted)">Loading tickets…</div>
+    </div>
+  </div>
+
+  <!-- Right: result panel -->
+  <div class="result-panel" id="resultPanel">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">🎫</div>
+      <p>Select a ticket to triage</p>
+      <p style="font-size:12px;opacity:0.6">Results will appear here with full trace data in Logfire</p>
+    </div>
+
+    <div class="result-content" id="resultContent">
+      <div class="result-subject" id="resultSubject"></div>
+      <div class="result-body-text" id="resultBody"></div>
+
+      <div class="result-badges" id="resultBadges">
+        <span class="badge badge-category" id="badgeCategory"></span>
+        <span class="badge" id="badgeSeverity"></span>
+        <div class="confidence-wrap" style="flex:1;min-width:160px">
+          <span class="confidence-label">Confidence</span>
+          <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width:0%"></div>
+          </div>
+          <span class="confidence-pct" id="confidencePct">0%</span>
+        </div>
+      </div>
+
+      <div class="result-section">
+        <div class="section-label">Summary</div>
+        <div class="summary-text" id="summaryText"></div>
+      </div>
+
+      <div class="result-section">
+        <div class="section-label">Draft Response</div>
+        <div class="draft-wrap">
+          <div class="draft-response" id="draftResponse"></div>
+          <button class="copy-btn" id="copyBtn" onclick="copyDraft()">Copy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom: history feed -->
+  <div class="history-panel">
+    <div class="panel-header">
+      <span class="panel-title">History Feed</span>
+      <span class="ticket-count" id="historyCount">0 results</span>
+    </div>
+    <div class="history-list" id="historyList">
+      <div style="padding:8px 0;color:var(--text-muted);font-size:12px">No results yet</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ── State ──
+  let tickets = [];
+  let history = [];
+  let activeId = null;
+
+  // ── Boot ──
+  async function init() {
+    try {
+      const res = await fetch('/tickets');
+      tickets = await res.json();
+      renderTicketList();
+    } catch (e) {
+      document.getElementById('ticketList').innerHTML =
+        `<div style="padding:16px;color:var(--red)">Failed to load tickets: ${e.message}</div>`;
+    }
+  }
+
+  // ── Render ticket list ──
+  function renderTicketList() {
+    document.getElementById('ticketCount').textContent = `${tickets.length} tickets`;
+    const list = document.getElementById('ticketList');
+    list.innerHTML = tickets.map(t => `
+      <div class="ticket-card" id="card-${t.id}" data-id="${t.id}">
+        <div class="card-top">
+          <div class="card-subject">${escHtml(t.subject)}</div>
+          <span class="tier-badge tier-${t.customer_tier}">${t.customer_tier}</span>
+        </div>
+        <div style="display:flex;align-items:center;margin-top:6px">
+          <span class="card-id">${t.id}</span>
+          <div class="spinner"></div>
+          <button class="triage-btn" onclick="triageSingle('${t.id}')">Triage →</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // ── Triage a single ticket ──
+  async function triageSingle(id) {
+    const ticket = tickets.find(t => t.id === id);
+    if (!ticket) return;
+
+    activeId = id;
+    setCardProcessing(id, true);
+    scrollCardIntoView(id);
+
+    try {
+      const res = await fetch('/triage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ticket),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      showResult(data);
+      addToHistory(data);
+    } catch (e) {
+      showError(`Triage failed: ${e.message}`);
+    } finally {
+      setCardProcessing(id, false);
+      setCardActive(id);
+    }
+  }
+
+  // ── Triage all tickets via batch endpoint ──
+  async function triageAll() {
+    const btn = document.getElementById('triageAllBtn');
+    const label = document.getElementById('triageAllLabel');
+    const icon = document.getElementById('triageAllIcon');
+
+    btn.disabled = true;
+    icon.textContent = '⏳';
+    label.textContent = 'Triaging…';
+
+    const ids = tickets.map(t => t.id);
+
+    // Kick off the batch request
+    try {
+      // Animate through cards while waiting
+      let i = 0;
+      const animInterval = setInterval(() => {
+        if (i > 0) setCardProcessing(ids[i - 1], false);
+        if (i < ids.length) {
+          setCardProcessing(ids[i], true);
+          scrollCardIntoView(ids[i]);
+          i++;
+        } else {
+          clearInterval(animInterval);
+        }
+      }, 600);
+
+      const res = await fetch('/triage/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticket_ids: ids }),
+      });
+
+      clearInterval(animInterval);
+      ids.forEach(id => setCardProcessing(id, false));
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const results = await res.json();
+
+      // Show last result and populate history
+      results.forEach(r => addToHistory(r));
+      if (results.length > 0) {
+        showResult(results[results.length - 1]);
+        setCardActive(results[results.length - 1].ticket.id);
+      }
+
+    } catch (e) {
+      ids.forEach(id => setCardProcessing(id, false));
+      showError(`Batch triage failed: ${e.message}`);
+    }
+
+    btn.disabled = false;
+    icon.textContent = '⚡';
+    label.textContent = 'Triage All';
+  }
+
+  // ── Render result panel ──
+  function showResult(data) {
+    const { ticket, result } = data;
+
+    document.getElementById('emptyState').style.display = 'none';
+    const rc = document.getElementById('resultContent');
+    rc.style.display = 'block';
+
+    document.getElementById('resultSubject').textContent = ticket.subject;
+    document.getElementById('resultBody').textContent = ticket.body;
+
+    document.getElementById('badgeCategory').textContent = result.category.replace('_', ' ');
+
+    const sevBadge = document.getElementById('badgeSeverity');
+    sevBadge.textContent = result.severity;
+    sevBadge.className = `badge sev-${result.severity}`;
+
+    const pct = Math.round(result.confidence * 100);
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('confidencePct').textContent = pct + '%';
+
+    document.getElementById('summaryText').textContent = result.summary;
+    document.getElementById('draftResponse').textContent = result.draft_response;
+
+    // Reset copy button
+    const cb = document.getElementById('copyBtn');
+    cb.textContent = 'Copy';
+    cb.classList.remove('copied');
+
+    // Re-trigger animation
+    rc.style.animation = 'none';
+    requestAnimationFrame(() => { rc.style.animation = 'slideIn 0.25s ease-out'; });
+  }
+
+  function showError(msg) {
+    document.getElementById('emptyState').style.display = 'flex';
+    document.getElementById('emptyState').innerHTML =
+      `<div class="empty-icon">⚠️</div><p style="color:var(--red)">${escHtml(msg)}</p>`;
+    document.getElementById('resultContent').style.display = 'none';
+  }
+
+  // ── History feed ──
+  function addToHistory(data) {
+    const { ticket, result } = data;
+    history.unshift({
+      id: ticket.id,
+      category: result.category,
+      severity: result.severity,
+      confidence: result.confidence,
+      time: new Date(),
+    });
+    if (history.length > 10) history.pop();
+    renderHistory();
+  }
+
+  function renderHistory() {
+    document.getElementById('historyCount').textContent = `${history.length} result${history.length !== 1 ? 's' : ''}`;
+    const list = document.getElementById('historyList');
+    if (history.length === 0) {
+      list.innerHTML = '<div style="padding:8px 0;color:var(--text-muted);font-size:12px">No results yet</div>';
+      return;
+    }
+    list.innerHTML = history.map(h => `
+      <div class="history-row">
+        <span class="hist-id">${h.id}</span>
+        <span class="hist-cat">${h.category.replace('_', ' ')}</span>
+        <span class="hist-badge sev-${h.severity} badge">${h.severity}</span>
+        <span class="hist-conf">${Math.round(h.confidence * 100)}%</span>
+        <span class="hist-time">${formatTime(h.time)}</span>
+      </div>
+    `).join('');
+  }
+
+  // ── Helpers ──
+  function setCardProcessing(id, on) {
+    const card = document.getElementById(`card-${id}`);
+    if (!card) return;
+    card.classList.toggle('processing', on);
+  }
+
+  function setCardActive(id) {
+    document.querySelectorAll('.ticket-card').forEach(c => c.classList.remove('active'));
+    const card = document.getElementById(`card-${id}`);
+    if (card) card.classList.add('active');
+  }
+
+  function scrollCardIntoView(id) {
+    const card = document.getElementById(`card-${id}`);
+    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function copyDraft() {
+    const text = document.getElementById('draftResponse').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById('copyBtn');
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'Copy';
+        btn.classList.remove('copied');
+      }, 2000);
+    });
+  }
+
+  function formatTime(d) {
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  init();
+</script>
+</body>
+</html>

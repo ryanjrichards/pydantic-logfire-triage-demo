@@ -1,0 +1,126 @@
+from __future__ import annotations
+
+from models import SupportTicket
+
+SEED_TICKETS: list[SupportTicket] = [
+    SupportTicket(
+        id="ticket_001",
+        subject="Can't log into my account",
+        body="Hi, I've been trying to log in for the past hour and keep getting an 'Invalid credentials' error. I know my password is correct because I just reset it. This is really urgent — I have a presentation in 2 hours and all my files are in there. Please help ASAP.",
+        customer_tier="pro",
+    ),
+    SupportTicket(
+        id="ticket_002",
+        subject="Invoice shows wrong amount",
+        body="My invoice for March shows $299 but I'm on the $99/month plan. I have not upgraded and did not authorize any additional charges. Please refund the difference immediately. My account email is the one this is sent from.",
+        customer_tier="pro",
+    ),
+    SupportTicket(
+        id="ticket_003",
+        subject="API returning 500 errors on all requests",
+        body="As of approximately 14:23 UTC today, every call to your REST API is returning HTTP 500. This is affecting our entire production pipeline. We process roughly 50,000 requests per hour through your API and everything has ground to a halt. Our engineers have confirmed the issue is on your end — our requests are well-formed and identical to ones that worked an hour ago. This is a Severity 1 incident for us.",
+        customer_tier="enterprise",
+    ),
+    SupportTicket(
+        id="ticket_004",
+        subject="Feature request: bulk export to CSV",
+        body="Would love a way to export all my project data to CSV. Right now I have to copy-paste everything manually which takes forever. Even a basic export without formatting would be super helpful. Thanks!",
+        customer_tier="free",
+    ),
+    SupportTicket(
+        id="ticket_005",
+        subject="Dashboard loading extremely slowly",
+        body="The main dashboard takes about 45 seconds to load every time I open it. This started happening about a week ago. I've tried different browsers and cleared my cache — same issue. My colleague on the same account doesn't have this problem. We're both in the US. Is there something wrong with my account specifically?",
+        customer_tier="pro",
+    ),
+    SupportTicket(
+        id="ticket_006",
+        subject="How do I add a team member?",
+        body="Hi, I'm trying to figure out how to invite a colleague to my workspace. I looked in settings but couldn't find anything obvious. Is this a feature that exists? I'm on the free plan if that matters.",
+        customer_tier="free",
+    ),
+    SupportTicket(
+        id="ticket_007",
+        subject="Data corruption after last night's migration",
+        body="Critical issue: following last night's scheduled maintenance, approximately 3 years of historical records appear to be corrupted or missing from our account. We have 47 enterprise clients whose data is stored in our workspace. Our legal team has been notified. We need immediate escalation to your engineering team and a root cause analysis within 24 hours.",
+        customer_tier="enterprise",
+    ),
+    SupportTicket(
+        id="ticket_008",
+        subject="Upgrade from Pro to Enterprise",
+        body="We're looking to upgrade our account from Pro to Enterprise. We have about 200 users and need SSO, audit logs, and dedicated support. Can you send me pricing and a contract? I'd like to get this done before end of quarter.",
+        customer_tier="pro",
+    ),
+    SupportTicket(
+        id="ticket_009",
+        subject="Dark mode please",
+        body="Any chance dark mode is on the roadmap? My eyes thank you in advance. Love the product otherwise!",
+        customer_tier="free",
+    ),
+    SupportTicket(
+        id="ticket_010",
+        subject="Webhook not firing on record update events",
+        body="Our webhook endpoint is configured and receives 'record.created' events fine, but 'record.updated' events never arrive. I've tested this extensively — updates via the UI trigger nothing. We're building an automation that depends on these events and it's been broken for two weeks. Logs from our endpoint confirm zero POST requests for update events.",
+        customer_tier="pro",
+    ),
+    SupportTicket(
+        id="ticket_011",
+        subject="Suspicious login from unknown location",
+        body="I just received an email saying someone logged into my account from São Paulo, Brazil. I'm in Chicago and have never been to Brazil. I immediately changed my password, but I'm worried about what they may have accessed. Do you have an audit log of what they did? Should I be concerned about data exposure?",
+        customer_tier="enterprise",
+    ),
+    SupportTicket(
+        id="ticket_012",
+        subject="PDF exports look garbled",
+        body="When I export any report to PDF, the charts look fine but all the table data comes out as weird symbols and boxes. The same report looks perfect in the app. Tried on Chrome and Firefox, same result. Attaching a screenshot... well I can't attach files here so I'll describe it: it looks like encoding issues, maybe UTF-8 vs Latin-1?",
+        customer_tier="pro",
+    ),
+    SupportTicket(
+        id="ticket_013",
+        subject="Need to cancel my subscription",
+        body="I'd like to cancel my subscription effective at the end of this billing cycle. I'm not unhappy with the product, we're just downsizing our tech stack after some budget cuts. Is there anything I need to do beyond this ticket?",
+        customer_tier="pro",
+    ),
+    SupportTicket(
+        id="ticket_014",
+        subject="App crashes when uploading files over 10MB",
+        body="Consistent crash every time I try to upload a file larger than about 10MB. The upload progress bar gets to 100% and then the whole browser tab crashes. Tested with 4 different files of varying sizes — anything under 10MB works, anything over crashes. Using Chrome 121 on macOS Sonoma.",
+        customer_tier="free",
+    ),
+    SupportTicket(
+        id="ticket_015",
+        subject="Need HIPAA BAA signed before we can go live",
+        body="Our legal and compliance team requires a signed Business Associate Agreement before we can use your platform in production. We're a healthcare company and will be storing PHI. I've looked through your compliance documentation and see you're HIPAA eligible, but I need the actual BAA signed. Who do I contact for this? We have a hard go-live deadline of April 30th.",
+        customer_tier="enterprise",
+    ),
+    SupportTicket(
+        id="ticket_016",
+        subject="Two-factor authentication codes not working",
+        body="My 2FA codes from Google Authenticator stopped working this morning. I'm completely locked out. I do have my backup codes but they're on a device I don't have access to right now. Is there any way to verify my identity another way and get back in? My account has critical business data.",
+        customer_tier="pro",
+    ),
+    SupportTicket(
+        id="ticket_017",
+        subject="Integrate with Salesforce?",
+        body="Does your platform integrate with Salesforce CRM? We'd want to sync contact records both ways. If not native, is there a Zapier connector or an API we could use to build our own? This is a key requirement for our team.",
+        customer_tier="enterprise",
+    ),
+    SupportTicket(
+        id="ticket_018",
+        subject="Search results seem wrong",
+        body="When I search for 'Q4 report', I get results from 2019 before I get results from last month. The relevance ordering seems off. Not a blocker but it makes the search kind of frustrating to use. Is this a known issue?",
+        customer_tier="free",
+    ),
+    SupportTicket(
+        id="ticket_019",
+        subject="Memory usage through the roof — desktop app unusable",
+        body="Your desktop app (Mac, v2.4.1) is consuming 8–12GB of RAM after being open for more than an hour. My MacBook Pro has 16GB total and the app is making the entire machine unusable. Activity Monitor shows the Electron helper processes going wild. I have to force quit it every couple of hours. This has been happening since the 2.4.0 update.",
+        customer_tier="pro",
+    ),
+    SupportTicket(
+        id="ticket_020",
+        subject="Wrong timezone on all my timestamps",
+        body="All the timestamps in my exports are showing in UTC but I'm in PST (UTC-8). I've set my timezone in account settings to America/Los_Angeles but the exports still show UTC. The UI itself shows the right timezone, only exports are wrong. Minor issue but causes confusion when sharing reports with my team.",
+        customer_tier="free",
+    ),
+]
