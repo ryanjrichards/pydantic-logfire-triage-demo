@@ -96,11 +96,11 @@ ORDER BY p95_seconds DESC
 ```sql
 SELECT
   date_trunc('minute', start_time) AS bucket,
-  avg(CASE WHEN (attributes->>'category_correct')::boolean THEN 1.0 ELSE 0.0 END) AS category_accuracy,
-  avg(CASE WHEN (attributes->>'severity_correct')::boolean THEN 1.0 ELSE 0.0 END) AS severity_accuracy,
-  avg((attributes->>'confidence')::float) AS avg_confidence
+  avg(CASE WHEN (attributes->'assertions'->'CategoryCorrect'->>'value')::boolean THEN 1.0 ELSE 0.0 END) AS category_accuracy,
+  avg(CASE WHEN (attributes->'assertions'->'SeverityCorrect'->>'value')::boolean THEN 1.0 ELSE 0.0 END) AS severity_accuracy,
+  avg((attributes->'attributes'->>'confidence')::float) AS avg_confidence
 FROM records
-WHERE message = 'eval.result'
+WHERE attributes->>'task_name' = 'eval_task'
 GROUP BY bucket
 ORDER BY bucket
 ```
