@@ -5,14 +5,11 @@ from pydantic_ai import Agent, AgentRunResult
 
 from models import SupportTicket, TriageResult
 
-# pydantic-ai automatically integrates with Logfire when logfire is configured —
-# every agent.run() call produces a full trace with LLM tokens, prompts, and
-# structured outputs, with zero extra instrumentation code needed.
-agent = Agent(
-    "google-gla:gemini-2.5-flash",
-    output_type=TriageResult,
-    name="support-triage",
-    system_prompt="""You are an expert customer support triage assistant.
+# Managed variable — edit the value in the Logfire UI without redeploying.
+# Requires LOGFIRE_API_KEY with project:read_variables scope.
+my_prompt = logfire.var(
+    "my_prompt",
+    default="""You are an expert customer support triage assistant.
 
 Your job is to analyze incoming support tickets and produce structured triage data.
 
@@ -38,6 +35,15 @@ Draft response guidelines:
 """,
 )
 
+# pydantic-ai automatically integrates with Logfire when logfire is configured —
+# every agent.run() call produces a full trace with LLM tokens, prompts, and
+# structured outputs, with zero extra instrumentation code needed.
+agent = Agent(
+    "google-gla:gemini-2.5-flash",
+    output_type=TriageResult,
+    name="support-triage",
+)
+
 
 def _build_prompt(ticket: SupportTicket) -> str:
     return f"""Please triage this support ticket:
@@ -52,7 +58,9 @@ Body:
 
 async def run_triage(ticket: SupportTicket) -> AgentRunResult[TriageResult]:
     """Run the agent and return the full result (includes usage, messages, etc.)."""
-    return await agent.run(_build_prompt(ticket))
+    with my_prompt.get() as resolved:
+        with agent.override(instructions=resolved.value):
+            return await agent.run(_build_prompt(ticket))
 
 
 async def triage_ticket(ticket: SupportTicket) -> TriageResult:
