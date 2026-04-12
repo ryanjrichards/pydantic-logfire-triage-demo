@@ -57,15 +57,9 @@ Open http://localhost:8000
 
 ## Managed variables
 
-The agent system prompt is a Logfire managed variable (`my_prompt`). Push label values without redeploying:
+The agent system prompt is a Logfire managed variable (`my_prompt`). Set and update its value from the Logfire UI under **Variables** — the running app reads the current value on every request without redeploying.
 
-```bash
-source .env.local && python push_variables.py
-```
-
-Requires `LOGFIRE_TOKEN` with `project:write_variables` scope. Once pushed, update the active value from the Logfire UI under **Variables** — the running app picks up changes on the next request.
-
-`push_variables.py` registers label `v1` (the simplified prompt) as the default (100% rollout). To A/B test a new prompt, add a second label and split the rollout weights.
+Requires `LOGFIRE_API_KEY` (separate from `LOGFIRE_TOKEN`) with `project:read_variables` scope. Get one from **Project Settings → Tokens → New Token**.
 
 ## Pre-populate Logfire before a demo
 
