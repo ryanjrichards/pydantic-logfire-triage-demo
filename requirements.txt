@@ -1,6 +1,8 @@
-logfire[fastapi]
+logfire[fastapi,asyncpg]
 fastapi
 uvicorn[standard]
 pydantic-ai[google]
 pydantic
 python-multipart
+python-dotenv
+asyncpg

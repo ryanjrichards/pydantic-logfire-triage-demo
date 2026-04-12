@@ -11,6 +11,8 @@ class SupportTicket(BaseModel):
     subject: str
     body: str
     customer_tier: Literal["free", "pro", "enterprise"]
+    username: str
+    company: str
 
 
 class Severity(str, Enum):

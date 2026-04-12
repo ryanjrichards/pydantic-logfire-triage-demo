@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from dotenv import load_dotenv
+
+load_dotenv(".env.local")
+
 import logfire
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,12 +15,24 @@ from pydantic import BaseModel
 # pydantic-ai (LLM calls, token counts, structured outputs) and FastAPI
 # (request traces, route spans, validation errors).
 logfire.configure()
+logfire.instrument_asyncpg()  # captures every asyncpg query as a span with SQL, parameters, and row counts
 
 from agent import triage_ticket  # noqa: E402 — must import after logfire.configure()
+from database import close_db, get_all_results, init_db, save_triage_result
 from models import SupportTicket, TriageResponse
 from seed_data import SEED_TICKETS
 
 app = FastAPI(title="AI Support Ticket Triage System")
+
+
+@app.on_event("startup")
+async def startup() -> None:
+    await init_db()
+
+
+@app.on_event("shutdown")
+async def shutdown() -> None:
+    await close_db()
 
 # Instrument FastAPI — captures every request as a trace with route, method,
 # status code, and latency. Unhandled exceptions are logged automatically.
@@ -32,7 +48,7 @@ app.add_middleware(
 # Mount static files for the frontend
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# In-memory store — no database needed for the demo
+# In-memory ticket store — seed data only, triage results are persisted to PostgreSQL
 _ticket_store: dict[str, SupportTicket] = {t.id: t for t in SEED_TICKETS}
 
 
@@ -63,6 +79,7 @@ async def triage_single(ticket: SupportTicket) -> TriageResponse:
         confidence=result.confidence,
     )
 
+    await save_triage_result(ticket.model_dump(), result.model_dump())
     return TriageResponse(ticket=ticket, result=result)
 
 
@@ -92,6 +109,13 @@ async def triage_batch(body: BatchRequest) -> list[TriageResponse]:
             confidence=result.confidence,
         )
 
+        await save_triage_result(ticket.model_dump(), result.model_dump())
         responses.append(TriageResponse(ticket=ticket, result=result))
 
     return responses
+
+
+@app.get("/results")
+async def list_results() -> list[dict]:
+    """Return all stored triage results, newest first."""
+    return await get_all_results()

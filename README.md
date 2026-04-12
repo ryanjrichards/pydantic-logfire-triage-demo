@@ -1,6 +1,6 @@
 # AI Support Ticket Triage System
 
-A FastAPI + pydantic-ai demo that triages support tickets using Gemini 2.0 Flash, with full observability via Logfire.
+A FastAPI + pydantic-ai demo that triages support tickets using Gemini 2.5 Flash, with full observability via Logfire and persistent storage in PostgreSQL.
 
 **GitHub:** https://github.com/ryanjrichards/pydantic-logfire-triage-demo
 
@@ -22,9 +22,30 @@ cp .env .env.local
 # .env.local
 GOOGLE_API_KEY=...    # aistudio.google.com/apikey
 LOGFIRE_TOKEN=...     # logfire.pydantic.dev → project settings → tokens
+DATABASE_URL=postgresql://user:password@localhost:5432/triage
 ```
 
 `.env.local` is gitignored — your secrets stay local. `.env` is committed as an empty template.
+
+## Database
+
+Triage results are persisted to PostgreSQL via asyncpg. The app creates the `triage_results` table automatically on startup — no migrations needed.
+
+```sql
+CREATE TABLE triage_results (
+    id         SERIAL PRIMARY KEY,
+    ticket_id  TEXT NOT NULL,
+    triaged_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    ticket     JSONB NOT NULL,
+    result     JSONB NOT NULL
+);
+```
+
+Every `/triage` and `/triage/batch` call writes a row. Retrieve all stored results:
+
+```
+GET /results
+```
 
 ## Run
 
@@ -84,16 +105,29 @@ GROUP BY bucket
 ORDER BY bucket
 ```
 
+### 4. Triage results from PostgreSQL
+```sql
+SELECT
+  ticket_id,
+  triaged_at,
+  result->>'category' AS category,
+  result->>'severity' AS severity,
+  (result->>'confidence')::float AS confidence
+FROM triage_results
+ORDER BY triaged_at DESC
+LIMIT 50
+```
+
 ## Step-by-step demo script
 
 1. **Open the UI** — go to http://localhost:8000. The ticket queue loads 20 realistic tickets.
 
-2. **Triage a ticket live** — click any ticket card, hit "Triage →". Watch the result panel animate in: category badge, severity color, confidence bar, draft response.
+2. **Triage a ticket live** — click any ticket card, hit "Triage →". Watch the result panel animate in: category badge, severity color, confidence bar, draft response. The result is saved to PostgreSQL automatically.
 
 3. **Pivot to Logfire** — open your Logfire project. You'll see a trace for the HTTP request, nested inside it the `agent.triage` span, and inside *that* the full pydantic-ai LLM call with token counts, prompt, and structured output — zero extra instrumentation code needed because pydantic-ai integrates with Logfire automatically.
 
-4. **Run SQL queries** — paste the three queries above into the Logfire SQL explorer. Show ticket volume by category, P95 latency by customer tier, and eval accuracy trends.
+4. **Run SQL queries** — paste the queries above into the Logfire SQL explorer. Show ticket volume by category, P95 latency by customer tier, and eval accuracy trends. Query the PostgreSQL table directly for the persisted history.
 
 5. **Run evals** — in a separate terminal run `python evals.py`. Each of the 10 golden-dataset tickets is triaged and logged as a structured `eval.result` span. The terminal prints a summary table; the eval pass rate SQL query in Logfire shows the trend over time.
 
-6. **Hit "Triage All"** — back in the UI, click the green "Triage All" button to batch-triage all 20 seed tickets in one shot. The history feed fills up and Logfire captures every trace.
+6. **Hit "Triage All"** — back in the UI, click the green "Triage All" button to batch-triage all 20 seed tickets in one shot. The history feed fills up, Logfire captures every trace, and all results land in PostgreSQL.

@@ -9,8 +9,8 @@ from models import SupportTicket, TriageResult
 # every agent.run() call produces a full trace with LLM tokens, prompts, and
 # structured outputs, with zero extra instrumentation code needed.
 agent = Agent(
-    "google-gla:gemini-2.0-flash",
-    result_type=TriageResult,
+    "google-gla:gemini-2.5-flash",
+    output_type=TriageResult,
     system_prompt="""You are an expert customer support triage assistant.
 
 Your job is to analyze incoming support tickets and produce structured triage data.
@@ -55,4 +55,4 @@ Body:
 {ticket.body}
 """
         result = await agent.run(prompt)
-        return result.data
+        return result.output

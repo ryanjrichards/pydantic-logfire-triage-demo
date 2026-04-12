@@ -235,22 +235,6 @@
       font-family: monospace;
     }
 
-    .triage-btn {
-      position: absolute;
-      right: 10px;
-      bottom: 10px;
-      padding: 3px 10px;
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--text-muted);
-      border-radius: 5px;
-      font-size: 11px;
-      cursor: pointer;
-      transition: border-color 0.15s, color 0.15s, background 0.15s;
-    }
-
-    .triage-btn:hover { border-color: var(--accent); color: var(--accent); }
-
     .spinner {
       display: none;
       width: 14px; height: 14px;
@@ -262,9 +246,68 @@
     }
 
     .ticket-card.processing .spinner { display: block; }
-    .ticket-card.processing .triage-btn { display: none; }
 
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Ticket preview (right panel) ── */
+    .ticket-preview {
+      display: none;
+      animation: slideIn 0.25s ease-out;
+    }
+
+    .preview-subject {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .preview-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .preview-body {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 20px;
+      white-space: pre-wrap;
+    }
+
+    .triage-now-btn {
+      width: 100%;
+      padding: 12px;
+      background: var(--accent-dim);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .triage-now-btn:hover:not(:disabled) { background: var(--accent); color: #000; }
+    .triage-now-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .triage-now-spinner {
+      display: none;
+      width: 16px; height: 16px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
 
     /* ── Right panel: result ── */
     .result-panel {
@@ -501,6 +544,42 @@
       min-width: 52px;
       text-align: right;
     }
+
+    .card-triaged-pill {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 7px;
+      border-radius: 10px;
+      color: var(--accent);
+      background: var(--accent-dim);
+      border: 1px solid var(--accent);
+    }
+
+    .card-untriaged {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    .retriage-btn {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 10px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .retriage-btn:hover {
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
   </style>
 </head>
 <body>
@@ -540,33 +619,80 @@
   <div class="result-panel" id="resultPanel">
     <div class="empty-state" id="emptyState">
       <div class="empty-icon">🎫</div>
-      <p>Select a ticket to triage</p>
-      <p style="font-size:12px;opacity:0.6">Results will appear here with full trace data in Logfire</p>
+      <p>Select a ticket from the queue</p>
+      <p style="font-size:12px;opacity:0.6">Review the ticket then triage it with one click</p>
+    </div>
+
+    <!-- Ticket preview — shown on card click, before triage -->
+    <div class="ticket-preview" id="ticketPreview">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:10px">Incoming Ticket</div>
+      <div class="preview-subject" id="previewSubject"></div>
+      <div class="preview-meta">
+        <span class="card-id" id="previewId"></span>
+        <span style="color:var(--border)">|</span>
+        <span style="font-size:12px;color:var(--text-muted)">From:</span>
+        <span style="font-size:12px;color:var(--text)" id="previewUsername"></span>
+        <span style="font-size:12px;color:var(--text-muted)">at</span>
+        <span style="font-size:12px;color:var(--text);font-weight:500" id="previewCompany"></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:14px">
+        <span style="font-size:12px;color:var(--text-muted)">Customer Tier:</span>
+        <span class="tier-badge" id="previewTier"></span>
+      </div>
+      <div class="section-label">Message</div>
+      <div class="preview-body" id="previewBody"></div>
+      <button class="triage-now-btn" id="triageNowBtn" onclick="triageSelected()">
+        <div class="triage-now-spinner" id="triageNowSpinner"></div>
+        <span id="triageNowLabel">⚡ Triage this ticket</span>
+      </button>
     </div>
 
     <div class="result-content" id="resultContent">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted)">Triage Result</div>
+        <button class="retriage-btn" id="retriageBtn" onclick="retriageActive()" style="display:none">↺ Re-triage</button>
+      </div>
       <div class="result-subject" id="resultSubject"></div>
-      <div class="result-body-text" id="resultBody"></div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:16px;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--text-muted)">From:</span>
+        <span style="font-size:12px;color:var(--text)" id="resultUsername"></span>
+        <span style="font-size:12px;color:var(--text-muted)">at</span>
+        <span style="font-size:12px;color:var(--text);font-weight:500" id="resultCompany"></span>
+        <span style="color:var(--border)">|</span>
+        <span style="font-size:12px;color:var(--text-muted)">Tier:</span>
+        <span class="tier-badge" id="resultTier"></span>
+      </div>
 
-      <div class="result-badges" id="resultBadges">
-        <span class="badge badge-category" id="badgeCategory"></span>
-        <span class="badge" id="badgeSeverity"></span>
-        <div class="confidence-wrap" style="flex:1;min-width:160px">
-          <span class="confidence-label">Confidence</span>
-          <div class="progress-bar">
-            <div class="progress-fill" id="progressFill" style="width:0%"></div>
+      <div class="section-label">AI Classification</div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:16px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <div>
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:4px">Category</div>
+            <span class="badge badge-category" id="badgeCategory"></span>
           </div>
-          <span class="confidence-pct" id="confidencePct">0%</span>
+          <div>
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:4px">Severity</div>
+            <span class="badge" id="badgeSeverity"></span>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:6px">Confidence</div>
+          <div class="confidence-wrap">
+            <div class="progress-bar">
+              <div class="progress-fill" id="progressFill" style="width:0%"></div>
+            </div>
+            <span class="confidence-pct" id="confidencePct">0%</span>
+          </div>
         </div>
       </div>
 
       <div class="result-section">
-        <div class="section-label">Summary</div>
+        <div class="section-label">AI Summary</div>
         <div class="summary-text" id="summaryText"></div>
       </div>
 
       <div class="result-section">
-        <div class="section-label">Draft Response</div>
+        <div class="section-label">Suggested Draft Response</div>
         <div class="draft-wrap">
           <div class="draft-response" id="draftResponse"></div>
           <button class="copy-btn" id="copyBtn" onclick="copyDraft()">Copy</button>
@@ -593,13 +719,35 @@
   let tickets = [];
   let history = [];
   let activeId = null;
+  // Maps ticket_id → most recent { ticket, result } from DB
+  const triagedTickets = new Map();
 
   // ── Boot ──
   async function init() {
     try {
-      const res = await fetch('/tickets');
-      tickets = await res.json();
+      const [ticketRes, resultsRes] = await Promise.all([
+        fetch('/tickets'),
+        fetch('/results'),
+      ]);
+      tickets = await ticketRes.json();
       renderTicketList();
+
+      const saved = await resultsRes.json();
+      saved.forEach(row => {
+        history.push({
+          id: row.ticket_id,
+          category: row.result.category,
+          severity: row.result.severity,
+          confidence: row.result.confidence,
+          time: new Date(row.triaged_at),
+        });
+        // First occurrence is most recent (results are newest-first)
+        if (!triagedTickets.has(row.ticket_id)) {
+          triagedTickets.set(row.ticket_id, { ticket: row.ticket, result: row.result });
+        }
+      });
+      renderTicketList(); // re-render now that triage state is known
+      renderHistory();
     } catch (e) {
       document.getElementById('ticketList').innerHTML =
         `<div style="padding:16px;color:var(--red)">Failed to load tickets: ${e.message}</div>`;
@@ -610,29 +758,87 @@
   function renderTicketList() {
     document.getElementById('ticketCount').textContent = `${tickets.length} tickets`;
     const list = document.getElementById('ticketList');
-    list.innerHTML = tickets.map(t => `
-      <div class="ticket-card" id="card-${t.id}" data-id="${t.id}">
+    list.innerHTML = tickets.map(t => cardHtml(t)).join('');
+  }
+
+  function cardHtml(t) {
+    const prior = triagedTickets.get(t.id);
+    const triageMeta = prior
+      ? `<span class="card-triaged-pill">✓ triaged</span>`
+      : `<span class="card-untriaged">pending</span>`;
+    return `
+      <div class="ticket-card" id="card-${t.id}" data-id="${t.id}" onclick="selectTicket('${t.id}')">
         <div class="card-top">
           <div class="card-subject">${escHtml(t.subject)}</div>
           <span class="tier-badge tier-${t.customer_tier}">${t.customer_tier}</span>
         </div>
-        <div style="display:flex;align-items:center;margin-top:6px">
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
           <span class="card-id">${t.id}</span>
-          <div class="spinner"></div>
-          <button class="triage-btn" onclick="triageSingle('${t.id}')">Triage →</button>
+          <span style="color:var(--border);font-size:11px">·</span>
+          <span style="font-size:11px;color:var(--text-muted)">${escHtml(t.company)}</span>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
+            ${triageMeta}
+            <div class="spinner"></div>
+          </div>
         </div>
       </div>
-    `).join('');
+    `;
   }
 
-  // ── Triage a single ticket ──
-  async function triageSingle(id) {
+  function updateCardTriagedState(ticketId) {
+    const card = document.getElementById(`card-${ticketId}`);
+    if (!card) return;
+    const meta = card.querySelector('.card-untriaged, .card-triaged-pill');
+    if (meta) {
+      const span = document.createElement('span');
+      span.className = 'card-triaged-pill';
+      span.textContent = '✓ triaged';
+      meta.replaceWith(span);
+    }
+  }
+
+  // ── Select ticket — show prior result or preview ──
+  function selectTicket(id) {
     const ticket = tickets.find(t => t.id === id);
     if (!ticket) return;
 
     activeId = id;
-    setCardProcessing(id, true);
-    scrollCardIntoView(id);
+    setCardActive(id);
+
+    const prior = triagedTickets.get(id);
+    if (prior) {
+      showResult(prior, /* showRetriage */ true);
+      return;
+    }
+
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('resultContent').style.display = 'none';
+
+    document.getElementById('previewSubject').textContent = ticket.subject;
+    document.getElementById('previewId').textContent = ticket.id;
+    document.getElementById('previewUsername').textContent = ticket.username;
+    document.getElementById('previewCompany').textContent = ticket.company;
+    const tierEl = document.getElementById('previewTier');
+    tierEl.textContent = ticket.customer_tier;
+    tierEl.className = `tier-badge tier-${ticket.customer_tier}`;
+    document.getElementById('previewBody').textContent = ticket.body;
+
+    const preview = document.getElementById('ticketPreview');
+    preview.style.display = 'block';
+    preview.style.animation = 'none';
+    requestAnimationFrame(() => { preview.style.animation = 'slideIn 0.25s ease-out'; });
+
+    setTriageButtonLoading(false);
+  }
+
+  // ── Triage the currently selected ticket ──
+  async function triageSelected() {
+    if (!activeId) return;
+    const ticket = tickets.find(t => t.id === activeId);
+    if (!ticket) return;
+
+    setTriageButtonLoading(true);
+    setCardProcessing(activeId, true);
 
     try {
       const res = await fetch('/triage', {
@@ -643,14 +849,46 @@
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      triagedTickets.set(data.ticket.id, { ticket: data.ticket, result: data.result });
+      updateCardTriagedState(data.ticket.id);
       showResult(data);
       addToHistory(data);
     } catch (e) {
       showError(`Triage failed: ${e.message}`);
     } finally {
-      setCardProcessing(id, false);
-      setCardActive(id);
+      setTriageButtonLoading(false);
+      setCardProcessing(activeId, false);
     }
+  }
+
+  function retriageActive() {
+    if (!activeId) return;
+    const ticket = tickets.find(t => t.id === activeId);
+    if (!ticket) return;
+    // Show the ticket preview so the user can confirm and hit Triage
+    document.getElementById('resultContent').style.display = 'none';
+    document.getElementById('previewSubject').textContent = ticket.subject;
+    document.getElementById('previewId').textContent = ticket.id;
+    document.getElementById('previewUsername').textContent = ticket.username;
+    document.getElementById('previewCompany').textContent = ticket.company;
+    const tierEl = document.getElementById('previewTier');
+    tierEl.textContent = ticket.customer_tier;
+    tierEl.className = `tier-badge tier-${ticket.customer_tier}`;
+    document.getElementById('previewBody').textContent = ticket.body;
+    const preview = document.getElementById('ticketPreview');
+    preview.style.display = 'block';
+    preview.style.animation = 'none';
+    requestAnimationFrame(() => { preview.style.animation = 'slideIn 0.25s ease-out'; });
+    setTriageButtonLoading(false);
+  }
+
+  function setTriageButtonLoading(on) {
+    const btn = document.getElementById('triageNowBtn');
+    const spinner = document.getElementById('triageNowSpinner');
+    const label = document.getElementById('triageNowLabel');
+    btn.disabled = on;
+    spinner.style.display = on ? 'block' : 'none';
+    label.textContent = on ? 'Triaging…' : '⚡ Triage this ticket';
   }
 
   // ── Triage all tickets via batch endpoint ──
@@ -693,7 +931,11 @@
       const results = await res.json();
 
       // Show last result and populate history
-      results.forEach(r => addToHistory(r));
+      results.forEach(r => {
+        triagedTickets.set(r.ticket.id, { ticket: r.ticket, result: r.result });
+        updateCardTriagedState(r.ticket.id);
+        addToHistory(r);
+      });
       if (results.length > 0) {
         showResult(results[results.length - 1]);
         setCardActive(results[results.length - 1].ticket.id);
@@ -710,17 +952,25 @@
   }
 
   // ── Render result panel ──
-  function showResult(data) {
+  function showResult(data, showRetriage = false) {
     const { ticket, result } = data;
 
     document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('ticketPreview').style.display = 'none';
     const rc = document.getElementById('resultContent');
     rc.style.display = 'block';
 
-    document.getElementById('resultSubject').textContent = ticket.subject;
-    document.getElementById('resultBody').textContent = ticket.body;
+    const reBtn = document.getElementById('retriageBtn');
+    reBtn.style.display = showRetriage ? 'inline-flex' : 'none';
 
-    document.getElementById('badgeCategory').textContent = result.category.replace('_', ' ');
+    document.getElementById('resultSubject').textContent = ticket.subject;
+    document.getElementById('resultUsername').textContent = ticket.username;
+    document.getElementById('resultCompany').textContent = ticket.company;
+    const resultTierEl = document.getElementById('resultTier');
+    resultTierEl.textContent = ticket.customer_tier;
+    resultTierEl.className = `tier-badge tier-${ticket.customer_tier}`;
+
+    document.getElementById('badgeCategory').textContent = result.category.replace(/_/g, ' ');
 
     const sevBadge = document.getElementById('badgeSeverity');
     sevBadge.textContent = result.severity;
@@ -744,10 +994,11 @@
   }
 
   function showError(msg) {
-    document.getElementById('emptyState').style.display = 'flex';
-    document.getElementById('emptyState').innerHTML =
-      `<div class="empty-icon">⚠️</div><p style="color:var(--red)">${escHtml(msg)}</p>`;
+    document.getElementById('ticketPreview').style.display = 'none';
     document.getElementById('resultContent').style.display = 'none';
+    const es = document.getElementById('emptyState');
+    es.style.display = 'flex';
+    es.innerHTML = `<div class="empty-icon">⚠️</div><p style="color:var(--red)">${escHtml(msg)}</p>`;
   }
 
   // ── History feed ──
@@ -760,7 +1011,6 @@
       confidence: result.confidence,
       time: new Date(),
     });
-    if (history.length > 10) history.pop();
     renderHistory();
   }
 
@@ -814,7 +1064,14 @@
   }
 
   function formatTime(d) {
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
   }
 
   function escHtml(s) {
