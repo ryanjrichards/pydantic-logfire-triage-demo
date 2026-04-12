@@ -2,18 +2,34 @@
 
 A FastAPI + pydantic-ai demo that triages support tickets using Claude Haiku, with full observability via Logfire.
 
+**GitHub:** https://github.com/ryanjrichards/pydantic-logfire-triage-demo
+
 ## Setup
 
 ```bash
+git clone https://github.com/ryanjrichards/pydantic-logfire-triage-demo.git
+cd pydantic-logfire-triage-demo
 pip install -r requirements.txt
-export ANTHROPIC_API_KEY=sk-ant-...
-export LOGFIRE_TOKEN=...          # from logfire.pydantic.dev → project settings
 ```
+
+Copy the env template and fill in your credentials:
+
+```bash
+cp .env .env.local
+```
+
+```ini
+# .env.local
+ANTHROPIC_API_KEY=sk-ant-...
+LOGFIRE_TOKEN=...     # logfire.pydantic.dev → project settings → tokens
+```
+
+`.env.local` is gitignored — your secrets stay local. `.env` is committed as an empty template.
 
 ## Run
 
 ```bash
-uvicorn main:app --reload
+source .env.local && uvicorn main:app --reload
 ```
 
 Open http://localhost:8000
