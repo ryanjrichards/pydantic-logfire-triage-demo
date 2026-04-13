@@ -30,7 +30,7 @@ from logfire import CodeSource
 _git_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
 logfire.configure(
     service_name="support-triage",
-    service_version=_git_sha,
+    service_version="1.0.0",
     environment="evals",
     code_source=CodeSource(
         repository="https://github.com/ryanjrichards/pydantic-logfire-triage-demo",
