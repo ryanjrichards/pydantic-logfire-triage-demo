@@ -20,11 +20,23 @@ from dotenv import load_dotenv
 
 load_dotenv(".env.local")
 
+import subprocess
+
 import logfire
+from logfire import CodeSource
 
 # Configure Logfire before importing agent so the pydantic-ai integration
 # captures LLM traces even in standalone eval runs.
-logfire.configure()
+_git_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+logfire.configure(
+    service_name="support-triage",
+    service_version=_git_sha,
+    environment="evals",
+    code_source=CodeSource(
+        repository="https://github.com/ryanjrichards/pydantic-logfire-triage-demo",
+        revision=_git_sha,
+    ),
+)
 logfire.instrument_pydantic_ai()
 
 import genai_prices

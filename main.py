@@ -4,7 +4,10 @@ from dotenv import load_dotenv
 
 load_dotenv(".env.local")
 
+import subprocess
+
 import logfire
+from logfire import CodeSource
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -14,7 +17,16 @@ from pydantic import BaseModel
 # Configure Logfire first — this enables automatic instrumentation for
 # pydantic-ai (LLM calls, token counts, structured outputs) and FastAPI
 # (request traces, route spans, validation errors).
-logfire.configure(service_name="support-triage")
+_git_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+logfire.configure(
+    service_name="support-triage",
+    service_version=_git_sha,
+    environment="development",
+    code_source=CodeSource(
+        repository="https://github.com/ryanjrichards/pydantic-logfire-triage-demo",
+        revision=_git_sha,
+    ),
+)
 logfire.instrument_pydantic_ai()  # sets gen_ai.agent.name so agents appear in the Logfire Agents view
 logfire.instrument_asyncpg()  # captures every asyncpg query as a span with SQL, parameters, and row counts
 
