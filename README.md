@@ -23,6 +23,9 @@ cp .env .env.local
 GOOGLE_API_KEY=...    # aistudio.google.com/apikey
 LOGFIRE_TOKEN=...     # logfire.pydantic.dev → project settings → tokens
 DATABASE_URL=postgresql://user:password@localhost:5432/triage
+LOGFIRE_API_KEY=...   # project:read_variables scope — for managed variables
+SERVICE=support-triage
+ENV=dev
 ```
 
 `.env.local` is gitignored — your secrets stay local. `.env` is committed as an empty template.
@@ -90,18 +93,19 @@ ORDER BY count DESC
 ```sql
 SELECT
   attributes->>'customer_tier' AS tier,
-  percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ns / 1e9) AS p95_seconds,
+  round((percentile_cont(0.95) WITHIN GROUP (ORDER BY duration))::numeric, 2) AS p95_seconds,
   count(*) AS calls
 FROM records
 WHERE span_name = 'agent.triage'
 GROUP BY tier
 ORDER BY p95_seconds DESC
+LIMIT 20
 ```
 
 ### 3. Eval pass rate over time
 ```sql
 SELECT
-  date_trunc('minute', start_time) AS bucket,
+  date_trunc('minute', start_timestamp) AS bucket,
   avg(CASE WHEN (attributes->'assertions'->'CategoryCorrect'->>'value')::boolean THEN 1.0 ELSE 0.0 END) AS category_accuracy,
   avg(CASE WHEN (attributes->'assertions'->'SeverityCorrect'->>'value')::boolean THEN 1.0 ELSE 0.0 END) AS severity_accuracy,
   avg((attributes->'attributes'->>'confidence')::float) AS avg_confidence
@@ -109,18 +113,21 @@ FROM records
 WHERE attributes->>'task_name' = 'eval_task'
 GROUP BY bucket
 ORDER BY bucket
+LIMIT 500
 ```
 
-### 4. Triage results from PostgreSQL
+### 4. Triage results
 ```sql
 SELECT
-  ticket_id,
-  triaged_at,
-  result->>'category' AS category,
-  result->>'severity' AS severity,
-  (result->>'confidence')::float AS confidence
-FROM triage_results
-ORDER BY triaged_at DESC
+  start_timestamp AS triaged_at,
+  attributes->>'ticket_id' AS ticket_id,
+  attributes->>'customer_tier' AS tier,
+  attributes->>'category' AS category,
+  attributes->>'severity' AS severity,
+  round((attributes->>'confidence')::numeric, 2) AS confidence
+FROM records
+WHERE message = 'triage.complete'
+ORDER BY start_timestamp DESC
 LIMIT 50
 ```
 
