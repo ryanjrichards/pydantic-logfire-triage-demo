@@ -6,6 +6,10 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
+class LinearOAuthError(Exception):
+    """Raised when the Linear OAuth token is expired or invalid."""
+
+
 class SupportTicket(BaseModel):
     id: str
     subject: str

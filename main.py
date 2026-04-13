@@ -33,7 +33,7 @@ logfire.instrument_asyncpg()  # captures every asyncpg query as a span with SQL,
 
 from agent import triage_ticket  # noqa: E402 — must import after logfire.configure()
 from database import close_db, get_all_results, init_db, save_triage_result
-from models import SupportTicket, TriageResponse
+from models import LinearOAuthError, SupportTicket, TriageResponse
 from seed_data import SEED_TICKETS
 
 app = FastAPI(title="AI Support Ticket Triage System")
@@ -80,55 +80,57 @@ async def list_tickets() -> list[SupportTicket]:
 @app.post("/triage", response_model=TriageResponse)
 async def triage_single(ticket: SupportTicket) -> TriageResponse:
     """Triage a single ticket and return structured results."""
-    result = await triage_ticket(ticket)
-
-    # Record triage outcome attributes on the FastAPI request span so every
-    # trace in Logfire carries category, severity, and confidence for SQL queries.
-    logfire.info(
-        "triage.complete",
-        ticket_id=ticket.id,
-        customer_tier=ticket.customer_tier,
-        category=result.category,
-        severity=result.severity.value,
-        confidence=result.confidence,
-    )
-
-    # Feature requests are automatically linked to the product roadmap via
-    # the Linear integration. This requires a valid OAuth token.
-    if result.category == "feature_request":
+    try:
         with logfire.span(
-            "roadmap.link",
+            "agent.triage",
             ticket_id=ticket.id,
-            roadmap_provider="linear",
-            feature_summary=result.summary,
+            customer_tier=ticket.customer_tier,
+            **{"gen_ai.agent.name": "support-triage"},
         ):
+            result = await triage_ticket(ticket)
+
+            # Record triage outcome attributes on the FastAPI request span so every
+            # trace in Logfire carries category, severity, and confidence for SQL queries.
             logfire.info(
-                "roadmap.link.attempt",
+                "triage.complete",
                 ticket_id=ticket.id,
-                action="auto_link_feature_request",
-                roadmap_board="product-backlog",
-            )
-            logfire.error(
-                "roadmap.link.failed",
-                ticket_id=ticket.id,
-                roadmap_provider="linear",
-                error_code="oauth_token_expired",
-                error_message=(
-                    "Linear OAuth token has expired. The roadmap integration cannot "
-                    "auto-link this feature request. Rotate the token at "
-                    "Settings → Integrations → Linear and update LINEAR_OAUTH_TOKEN."
-                ),
-            )
-            raise HTTPException(
-                status_code=502,
-                detail=(
-                    "Roadmap integration error: Linear OAuth token expired. "
-                    "Contact your admin to rotate the token."
-                ),
+                customer_tier=ticket.customer_tier,
+                category=result.category,
+                severity=result.severity.value,
+                confidence=result.confidence,
             )
 
-    await save_triage_result(ticket.model_dump(), result.model_dump())
-    return TriageResponse(ticket=ticket, result=result)
+            # Feature requests are automatically linked to the product roadmap via
+            # the Linear integration. This requires a valid OAuth token.
+            if result.category == "feature_request":
+                with logfire.span(
+                    "roadmap.link",
+                    ticket_id=ticket.id,
+                    roadmap_provider="linear",
+                    feature_summary=result.summary,
+                ):
+                    logfire.info(
+                        "roadmap.link.attempt",
+                        ticket_id=ticket.id,
+                        action="auto_link_feature_request",
+                        roadmap_board="product-backlog",
+                    )
+                    raise LinearOAuthError(
+                        "Linear OAuth token has expired. The roadmap integration cannot "
+                        "auto-link this feature request. Rotate the token at "
+                        "Settings → Integrations → Linear and update LINEAR_OAUTH_TOKEN."
+                    )
+
+            await save_triage_result(ticket.model_dump(), result.model_dump())
+            return TriageResponse(ticket=ticket, result=result)
+    except LinearOAuthError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Roadmap integration error: Linear OAuth token expired. "
+                "Contact your admin to rotate the token."
+            ),
+        ) from exc
 
 
 class BatchRequest(BaseModel):
@@ -145,53 +147,55 @@ async def triage_batch(body: BatchRequest) -> list[TriageResponse]:
         if ticket is None:
             raise HTTPException(status_code=404, detail=f"Ticket {ticket_id!r} not found")
 
-        result = await triage_ticket(ticket)
-
-        # Emit a span per ticket so batch runs produce rich, queryable trace data.
-        logfire.info(
-            "triage.batch.item",
-            ticket_id=ticket.id,
-            customer_tier=ticket.customer_tier,
-            category=result.category,
-            severity=result.severity.value,
-            confidence=result.confidence,
-        )
-
-        # Feature requests are automatically linked to the Linear roadmap board.
-        if result.category == "feature_request":
+        try:
             with logfire.span(
-                "roadmap.link",
+                "agent.triage",
                 ticket_id=ticket.id,
-                roadmap_provider="linear",
-                feature_summary=result.summary,
+                customer_tier=ticket.customer_tier,
+                **{"gen_ai.agent.name": "support-triage"},
             ):
+                result = await triage_ticket(ticket)
+
+                # Emit a span per ticket so batch runs produce rich, queryable trace data.
                 logfire.info(
-                    "roadmap.link.attempt",
+                    "triage.batch.item",
                     ticket_id=ticket.id,
-                    action="auto_link_feature_request",
-                    roadmap_board="product-backlog",
-                )
-                logfire.error(
-                    "roadmap.link.failed",
-                    ticket_id=ticket.id,
-                    roadmap_provider="linear",
-                    error_code="oauth_token_expired",
-                    error_message=(
-                        "Linear OAuth token has expired. The roadmap integration cannot "
-                        "auto-link this feature request. Rotate the token at "
-                        "Settings → Integrations → Linear and update LINEAR_OAUTH_TOKEN."
-                    ),
-                )
-                raise HTTPException(
-                    status_code=502,
-                    detail=(
-                        "Roadmap integration error: Linear OAuth token expired. "
-                        "Contact your admin to rotate the token."
-                    ),
+                    customer_tier=ticket.customer_tier,
+                    category=result.category,
+                    severity=result.severity.value,
+                    confidence=result.confidence,
                 )
 
-        await save_triage_result(ticket.model_dump(), result.model_dump())
-        responses.append(TriageResponse(ticket=ticket, result=result))
+                # Feature requests are automatically linked to the Linear roadmap board.
+                if result.category == "feature_request":
+                    with logfire.span(
+                        "roadmap.link",
+                        ticket_id=ticket.id,
+                        roadmap_provider="linear",
+                        feature_summary=result.summary,
+                    ):
+                        logfire.info(
+                            "roadmap.link.attempt",
+                            ticket_id=ticket.id,
+                            action="auto_link_feature_request",
+                            roadmap_board="product-backlog",
+                        )
+                        raise LinearOAuthError(
+                            "Linear OAuth token has expired. The roadmap integration cannot "
+                            "auto-link this feature request. Rotate the token at "
+                            "Settings → Integrations → Linear and update LINEAR_OAUTH_TOKEN."
+                        )
+
+                await save_triage_result(ticket.model_dump(), result.model_dump())
+                responses.append(TriageResponse(ticket=ticket, result=result))
+        except LinearOAuthError as exc:
+            raise HTTPException(
+                status_code=502,
+                detail=(
+                    "Roadmap integration error: Linear OAuth token expired. "
+                    "Contact your admin to rotate the token."
+                ),
+            ) from exc
 
     return responses
 

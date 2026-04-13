@@ -54,6 +54,8 @@ GET /results
 
 ```bash
 source .env.local && uvicorn main:app --reload
+
+source .env.local && python evals.py
 ```
 
 Open http://localhost:8000
@@ -116,7 +118,22 @@ ORDER BY bucket
 LIMIT 500
 ```
 
-### 4. Triage results
+### 4. Agent exceptions
+```sql
+SELECT
+  start_timestamp,
+  span_name,
+  attributes->>'ticket_id' AS ticket_id,
+  attributes->>'exception.type' AS exception_type,
+  attributes->>'exception.message' AS exception_message
+FROM records
+WHERE is_exception = true
+  AND attributes->>'gen_ai.agent.name' = 'support-triage'
+ORDER BY start_timestamp DESC
+LIMIT 50
+```
+
+### 5. Triage results
 ```sql
 SELECT
   start_timestamp AS triaged_at,
@@ -137,7 +154,7 @@ LIMIT 50
 
 2. **Triage a ticket live** — click any ticket card, hit "Triage →". Watch the result panel animate in: category badge, severity color, confidence bar, draft response. The result is saved to PostgreSQL automatically.
 
-3. **Triage a feature request (roadmap error demo)** — click the **"Feature request: bulk export to CSV"** ticket (jen.kowalski) and triage it. The AI agent categorizes it as `feature_request` and a nested `roadmap.link` span fires to auto-link it to the Linear product backlog. The OAuth token is expired, so the span fails with `error_code: oauth_token_expired`. In Logfire you'll see the full trace: the FastAPI request → `agent.triage` → `roadmap.link` → `roadmap.link.failed` error log with the actionable error message. The failed span surfaces in the Issues view, grouped by fingerprint across all feature-request tickets. Any other ticket categorized as `feature_request` triggers the same error — useful for showing how a single misconfigured integration can affect multiple traces.
+3. **Triage a feature request (roadmap error demo)** — click the **"Feature request: bulk export to CSV"** ticket (jen.kowalski) and triage it. The AI agent categorizes it as `feature_request` and a nested `roadmap.link` span fires to auto-link it to the Linear product backlog. The OAuth token is expired, so a `LinearOAuthError` is raised inside the span — propagating through both `roadmap.link` and the outer `agent.triage` span before being caught and converted to a 502. In Logfire you'll see the full trace: the FastAPI request → `agent.triage` → `roadmap.link`, with both spans marked `is_exception=true`. Because `agent.triage` carries `gen_ai.agent.name='support-triage'`, the error is queryable with `is_exception = true AND attributes->>'gen_ai.agent.name' = 'support-triage'`. The failed span surfaces in the Issues view, grouped by fingerprint across all feature-request tickets. Any other ticket categorized as `feature_request` triggers the same error — useful for showing how a single misconfigured integration can affect multiple traces.
 
 4. **Send a response (error demo)** — with any result on screen, click **Send Response**. The request hits `/send-response`, which simulates a misconfigured SendGrid API key and returns a 502. You'll see "Failed to send response." in the UI and a `logfire.error` span in Logfire with the full error context (`error_code`, `provider`, `ticket_id`). Good hook for showing how Logfire surfaces application errors alongside traces.
 

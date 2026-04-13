@@ -64,12 +64,5 @@ async def run_triage(ticket: SupportTicket) -> AgentRunResult[TriageResult]:
 
 
 async def triage_ticket(ticket: SupportTicket) -> TriageResult:
-    # Wrap the agent call in a named span so Logfire captures ticket-level
-    # attributes alongside the automatic pydantic-ai LLM trace.
-    with logfire.span(
-        "agent.triage",
-        ticket_id=ticket.id,
-        customer_tier=ticket.customer_tier,
-    ):
-        result = await run_triage(ticket)
-        return result.output
+    result = await run_triage(ticket)
+    return result.output
