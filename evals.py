@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 
 load_dotenv(".env.local")
 
+import os
 import subprocess
 
 import logfire
@@ -29,9 +30,9 @@ from logfire import CodeSource
 # captures LLM traces even in standalone eval runs.
 _git_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
 logfire.configure(
-    service_name="support-triage",
+    service_name=os.environ["SERVICE"],
     service_version="1.0.0",
-    environment="evals",
+    environment=os.environ["ENV"],
     code_source=CodeSource(
         repository="https://github.com/ryanjrichards/pydantic-logfire-triage-demo",
         revision=_git_sha,

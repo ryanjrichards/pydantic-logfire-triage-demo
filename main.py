@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv(".env.local")
 
+import os
 import subprocess
 
 import logfire
@@ -19,9 +20,9 @@ from pydantic import BaseModel
 # (request traces, route spans, validation errors).
 _git_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
 logfire.configure(
-    service_name="support-triage",
+    service_name=os.environ["SERVICE"],
     service_version="1.0.0",
-    environment="development",
+    environment=os.environ["ENV"],
     code_source=CodeSource(
         repository="https://github.com/ryanjrichards/pydantic-logfire-triage-demo",
         revision=_git_sha,
